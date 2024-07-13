@@ -1,2 +1,14 @@
 *.csv
 *.reflection.h
+*.tlog
+*CMakeFiles
+*.dir
+*Debug/
+*FileContentIndex/
+*.vs
+*.vcxproj
+*.filters
+*.user
+*.cmake
+*.sln
+CMakeCache.txt
