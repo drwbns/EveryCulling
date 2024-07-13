@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+using namespace culling;
+
 float culling::PI = 3.14159265358979323846f;
 float culling::DEGREE_TO_RADIAN = PI / 180.0f;
 float culling::RADIAN_TO_DEGREE = 180.0f / PI;

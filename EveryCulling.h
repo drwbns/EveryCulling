@@ -96,14 +96,15 @@ namespace culling
 		void OnStartCullingModule(const culling::CullingModule* const cullingModule);
 		// this function is called by multiple threads
 		void OnEndCullingModule(const culling::CullingModule* const cullingModule);
-		
+	
+	public:
 		void SetViewProjectionMatrix(const size_t cameraIndex, const culling::Mat4x4& viewProjectionMatrix);
 		void SetFieldOfViewInDegree(const size_t cameraIndex, const float fov);
 		void SetCameraNearFarClipPlaneDistance(const size_t cameraIndex, const float nearPlaneDistance, const float farPlaneDistance);;
 		void SetCameraWorldPosition(const size_t cameraIndex, const culling::Vec3& cameraWorldPos);
 		void SetCameraRotation(const size_t cameraIndex, const culling::Vec4& cameraRotation);
 
-	public:
+	
 
 		enum class CullingModuleType
 		{
