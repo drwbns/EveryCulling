@@ -13,6 +13,8 @@ set(CULLING_MODULE_SOURCES
     MaskedSWOcclusionCulling/Utility/vertexTransformationHelper.cpp
     PreCulling/PreCulling.cpp
     ViewFrustumCulling/ViewFrustumCulling.cpp
+	MaskedSWOcclusionCulling/OccluderListManager.cpp
+	MaskedSWOcclusionCulling/SWDepthBuffer.cpp
 )
 
 # Create a static library for CullingModule
