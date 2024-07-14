@@ -26,8 +26,15 @@ include_directories(${PROJECT_SOURCE_DIR}/CullingModule/PreCulling)
 add_subdirectory(DataType)
 add_subdirectory(CullingModule)
 
+# Add source files for CullingModule
+set(EVERYCULLING_MODULE_SOURCES
+    EveryCulling.cpp
+	EveryCullingProfiler.cpp
+	main.cpp
+)
+
 # Add the executable
-add_executable(EveryCulling main.cpp)
+add_executable(EveryCulling ${EVERYCULLING_MODULE_SOURCES})
 
 # Link libraries
 target_link_libraries(EveryCulling DataType CullingModule)
