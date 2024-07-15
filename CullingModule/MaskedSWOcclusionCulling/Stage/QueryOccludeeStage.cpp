@@ -6,7 +6,7 @@
 #include "../Utility/vertexTransformationHelper.h"
 #include "../Utility/depthBufferTileHelper.h"
 
-#include <Rendering/Renderer/Renderer.h>
+//#include <Rendering/Renderer/Renderer.h>
 
 EVERYCULLING_FORCE_INLINE float culling::QueryOccludeeStage::MinFloatFromM256F(const culling::EVERYCULLING_M256F& data)
 {
