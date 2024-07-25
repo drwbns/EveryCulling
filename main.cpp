@@ -1,4 +1,5 @@
 #include <OpenGL_helper.h>
+#include <glm/gtc/type_ptr.hpp>
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -118,7 +119,7 @@ void InitializeOpenGL() {
 void RenderModel(const Model& model, const glm::mat4& viewProjection) {
     // Bind shader program and set uniforms
     glUseProgram(model.shaderProgram);
-    glUniformMatrix4fv(glGetUniformLocation(model.shaderProgram, "viewProjection"), 1, GL_FALSE, glm::value_ptr(viewProjection));
+    glUniformMatrix4fv(glGetUniformLocation(model.shaderProgram, "viewProjection"), 1, GL_FALSE, &viewProjection[0][0]);
 
     // Bind VAO and draw
     glBindVertexArray(model.vao);
@@ -131,6 +132,8 @@ void RenderLoop(GLFWwindow* window, culling::EveryCulling& cullingSystem, const 
     glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 viewProjection = projection * view;
 
+    const size_t cameraIndex = 0; // Added this line to define cameraIndex
+
     while (!glfwWindowShouldClose(window)) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -139,11 +142,15 @@ void RenderLoop(GLFWwindow* window, culling::EveryCulling& cullingSystem, const 
         cullingSystem.ThreadCullJob(0, cullingSystem.GetTickCount());
         cullingSystem.WaitToFinishCullJob(0);
 
+        // Get active entity blocks
+        const auto& activeEntityBlocks = cullingSystem.GetActiveEntityBlockList();
+
         // Render models based on culling results
-        const auto& visibleModels = cullingSystem.GetVisibleModels();
-        for (size_t i = 0; i < visibleModels.size(); ++i) {
-            if (visibleModels[i]) {
-                RenderModel(models[i], viewProjection);
+        for (const auto& entityBlock : activeEntityBlocks) {
+            for (size_t i = 0; i < entityBlock->mCurrentEntityCount; ++i) {
+                if (!entityBlock->GetIsCulled(i, cameraIndex)) {
+                    RenderModel(models[i], viewProjection);
+                }
             }
         }
 
