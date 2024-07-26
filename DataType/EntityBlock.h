@@ -3,6 +3,7 @@
 #include "../EveryCullingCore.h"
 
 #include <atomic>
+#include <iostream>
 
 #include "Math/Vector.h"
 #include "Position_BoundingSphereRadius.h"
@@ -223,6 +224,18 @@ namespace culling
 		}
 
 		void ClearEntityBlock();
+
+		void PrintEntityBlockData(const EntityBlock* entityBlock, size_t entityIndex) {
+			const auto& vertexData = entityBlock->mVertexDatas[entityIndex];
+			std::cout << "EntityBlock data:" << std::endl;
+			std::cout << "  Vertices address: " << (void*)vertexData.mVertices << std::endl;
+			std::cout << "  Indices address: " << (void*)vertexData.mIndices << std::endl;
+			std::cout << "  Vertex count: " << vertexData.mVerticeCount << std::endl;
+			std::cout << "  Index count: " << vertexData.mIndiceCount << std::endl;
+			std::cout << "  Vertex stride: " << vertexData.mVertexStride << std::endl;
+			std::cout << "  Vertex checksum: " << vertexData.mVertexChecksum << std::endl;
+			std::cout << "  Index checksum: " << vertexData.mIndexChecksum << std::endl;
+		}
 	};
 
 

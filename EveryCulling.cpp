@@ -1,6 +1,7 @@
 #include "EveryCulling.h"
 
 #include <thread>
+#include <iostream>
 
 #include "DataType/EntityBlock.h"
 #include "CullingModule/ViewFrustumCulling/ViewFrustumCulling.h"
@@ -115,6 +116,7 @@ void culling::EveryCulling::RemoveEntityFromBlock(EntityBlock* ownerEntityBlock,
 
 void culling::EveryCulling::ThreadCullJob(const size_t cameraIndex, const unsigned long long tickCount)
 {
+    std::cout << "Starting culling job for camera " << cameraIndex << std::endl;
 
 	const std::uint32_t entityBlockCount = static_cast<std::uint32_t>(GetActiveEntityBlockCount());
 	const unsigned long long currentTickCount = mCurrentTickCount;
@@ -230,11 +232,18 @@ std::uint32_t culling::EveryCulling::GetRunningThreadCount() const
 
 culling::EntityBlock* culling::EveryCulling::AllocateNewEntityBlockFromPool()
 {
+	std::cout << "Entering AllocateNewEntityBlockFromPool" << std::endl;
+
 	EntityBlock* const newEntityBlock = GetNewEntityBlockFromPool();
 	newEntityBlock->ClearEntityBlock();
 
 	mActiveEntityBlockList.push_back(newEntityBlock);
 
+	std::cout << "New EntityBlock allocated:" << std::endl;
+	std::cout << "EntityBlock pointer: " << (void*)newEntityBlock << std::endl;
+	std::cout << "Active entity block count: " << mActiveEntityBlockList.size() << std::endl;
+
+	std::cout << "Exiting AllocateNewEntityBlockFromPool" << std::endl;
 	return newEntityBlock;
 }
 
@@ -244,20 +253,24 @@ culling::EntityBlock* culling::EveryCulling::AllocateNewEntityBlockFromPool()
 
 culling::EntityBlockViewer culling::EveryCulling::AllocateNewEntity()
 {
+	std::cout << "Entering AllocateNewEntity" << std::endl;
+
 	culling::EntityBlock* targetEntityBlock;
 	if (mActiveEntityBlockList.size() == 0)
 	{
+		std::cout << "No active entity blocks, allocating new block" << std::endl;
 		// if Any entityBlock isn't allocated yet
 		targetEntityBlock = AllocateNewEntityBlockFromPool();
 	}
 	else
 	{//When Allocated entity block count is at least one
-
+		std::cout << "Active entity blocks exist" << std::endl;
 		//Get last entityblock in active entities
 		targetEntityBlock = { mActiveEntityBlockList.back() };
 
 		if (targetEntityBlock->mCurrentEntityCount == EVERYCULLING_ENTITY_COUNT_IN_ENTITY_BLOCK)
 		{
+			std::cout << "Last entity block is full, allocating new block" << std::endl;
 			//if last entityblock in active entities is full of entities
 			//alocate new entity block
 			targetEntityBlock = AllocateNewEntityBlockFromPool();
@@ -268,7 +281,21 @@ culling::EntityBlockViewer culling::EveryCulling::AllocateNewEntity()
 	
 	targetEntityBlock->mCurrentEntityCount++;
 	
-	return EntityBlockViewer(targetEntityBlock, targetEntityBlock->mCurrentEntityCount - 1);
+	
+	EntityBlockViewer newViewer(targetEntityBlock, targetEntityBlock->mCurrentEntityCount - 1);
+	
+	std::cout << "New entity allocated:" << std::endl;
+	std::cout << "EntityBlock pointer: " << (void*)targetEntityBlock << std::endl;
+	std::cout << "Entity index: " << (targetEntityBlock->mCurrentEntityCount - 1) << std::endl;
+	std::cout << "Current entity count: " << targetEntityBlock->mCurrentEntityCount << std::endl;
+
+	std::cout << "New EntityBlockViewer:" << std::endl;
+    std::cout << "EntityBlockViewer this pointer: " << (void*)&newViewer << std::endl;
+    std::cout << "EntityBlockViewer mTargetEntityBlock: " << (void*)newViewer.mTargetEntityBlock << std::endl;
+    std::cout << "EntityBlockViewer mEntityIndexInBlock: " << newViewer.mEntityIndexInBlock << std::endl;
+
+    std::cout << "Exiting AllocateNewEntity" << std::endl;
+	return newViewer;
 }
 
 void culling::EveryCulling::RemoveEntityFromBlock(EntityBlockViewer& entityBlockViewer)

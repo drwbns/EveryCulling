@@ -22,7 +22,10 @@ namespace culling
 		///		-> Stride is 8byte!
 		/// </summary>
 		std::uint64_t mVertexStride; // 8byte
-		
+
+		uint64_t mVertexChecksum;  // New member for vertex checksum
+		uint64_t mIndexChecksum;   // New member for index checksum
+
 		EVERYCULLING_FORCE_INLINE void Reset(const unsigned long long currentTickCount)
 		{
 			if(EVERYCULLING_WHEN_TO_BIN_TRIANGLE(currentTickCount) == true)

@@ -7,8 +7,14 @@
 #include "../Utility/vertexTransformationHelper.h"
 #include "../Utility/depthBufferTileHelper.h"
 
+#include "Utils/CullingUtilities.h"
+
+
+#include "DataType/EntityBlock.h"
+
 
 #include "../Utility/RasterizerHelper.h"
+#include <Utils/MemoryUtils.h>
 
 #define DEFAULT_BINNED_TRIANGLE_COUNT_PER_LOOP 8
 
@@ -160,76 +166,57 @@ EVERYCULLING_FORCE_INLINE void culling::BinTrianglesStage::PassTrianglesToTileBi
 
 EVERYCULLING_FORCE_INLINE void culling::BinTrianglesStage::GatherVertices
 (
-	const float* const vertices,
-	const size_t verticeCount,
-	const std::uint32_t* const vertexIndices, 
-	const size_t indiceCount, 
-	const size_t currentIndiceIndex, 
-	const size_t vertexStrideByte, 
-	const size_t fetchTriangleCount,
-	culling::EVERYCULLING_M256F* outVerticesX, 
-	culling::EVERYCULLING_M256F* outVerticesY, 
-	culling::EVERYCULLING_M256F* outVerticesZ
+    const float* const vertices,
+    const size_t verticeCount,
+    const std::uint32_t* const vertexIndices, 
+    const size_t indiceCount, 
+    const size_t currentIndiceIndex, 
+    const size_t vertexStrideByte, 
+    const size_t fetchTriangleCount,
+    culling::EVERYCULLING_M256F* outVerticesX, 
+    culling::EVERYCULLING_M256F* outVerticesY, 
+    culling::EVERYCULLING_M256F* outVerticesZ
 )
 {
-	assert(indiceCount % 3 == 0);
-	assert(currentIndiceIndex % 3 == 0);
-	assert(indiceCount != 0); // TODO : implement gatherVertices when there is no indiceCount
-	
-	//Gather Indices
-	const std::uint32_t* currentVertexIndices = vertexIndices + currentIndiceIndex;
-	const culling::EVERYCULLING_M256I indiceIndexs = _mm256_set_epi32(21, 18, 15, 12, 9, 6, 3, 0);
-	static const culling::EVERYCULLING_M256I SIMD_LANE_MASK[9] = {
-		_mm256_setr_epi32(0,  0,  0,  0,  0,  0,  0,  0),
-		_mm256_setr_epi32(~0,  0,  0,  0,  0,  0,  0,  0),
-		_mm256_setr_epi32(~0, ~0,  0,  0,  0,  0,  0,  0),
-		_mm256_setr_epi32(~0, ~0, ~0,  0,  0,  0,  0,  0),
-		_mm256_setr_epi32(~0, ~0, ~0, ~0,  0,  0,  0,  0),
-		_mm256_setr_epi32(~0, ~0, ~0, ~0, ~0,  0,  0,  0),
-		_mm256_setr_epi32(~0, ~0, ~0, ~0, ~0, ~0,  0,  0),
-		_mm256_setr_epi32(~0, ~0, ~0, ~0, ~0, ~0, ~0,  0),
-		_mm256_setr_epi32(~0, ~0, ~0, ~0, ~0, ~0, ~0, ~0)
-	};
+    std::cout << "Entering GatherVertices" << std::endl;
+    std::cout << "vertices address: " << vertices << std::endl;
+    std::cout << "verticeCount: " << verticeCount << std::endl;
+    std::cout << "vertexIndices address: " << vertexIndices << std::endl;
+    std::cout << "indiceCount: " << indiceCount << std::endl;
+    std::cout << "currentIndiceIndex: " << currentIndiceIndex << std::endl;
+    std::cout << "vertexStrideByte: " << vertexStrideByte << std::endl;
+    std::cout << "fetchTriangleCount: " << fetchTriangleCount << std::endl;
 
-	// Compute per-lane index list offset that guards against out of bounds memory accesses
-	const culling::EVERYCULLING_M256I safeIndiceIndexs = _mm256_and_si256(indiceIndexs, SIMD_LANE_MASK[fetchTriangleCount]);
+    // Print out the first few indices
+    std::cout << "First few indices:" << std::endl;
+    for (size_t i = 0; i < std::min(indiceCount, size_t(10)); ++i) {
+        std::cout << "Index " << i << ": " << vertexIndices[i] << std::endl;
+    }
 
-	culling::EVERYCULLING_M256I m256i_indices[3];
-	//If stride is 7
-	//Current Value 
-	//m256i_indices[0] : 0 ( first vertex index ), 3, 6,  9, 12, 15, 18, 21
-	//m256i_indices[1] : 1 ( second vertex index ), 4, 7, 10, 13, 16, 19, 22
-	//m256i_indices[2] : 2, 5, 8, 11, 14, 17, 20, 23
-	//Point1 indices of Triangles
-	m256i_indices[0] = _mm256_i32gather_epi32(reinterpret_cast<const int*>(currentVertexIndices + 0), safeIndiceIndexs, 4); // why 4? -> vertexIndices is std::uint32_t( 4byte )
-	//Point2 indices of Triangles
-	m256i_indices[1] = _mm256_i32gather_epi32(reinterpret_cast<const int*>(currentVertexIndices + 1), safeIndiceIndexs, 4);
-	//Point3 indices of Triangles
-	m256i_indices[2] = _mm256_i32gather_epi32(reinterpret_cast<const int*>(currentVertexIndices + 2), safeIndiceIndexs, 4);
+    const size_t vertexStrideFloat = vertexStrideByte / sizeof(float);
 
-	if(vertexStrideByte > 0)
-	{
-		//Consider Stride
-		//If StrideByte is 28
-		//m256i_indices[0] : 0 * 28, 3 * 28, 6 * 28,  9 * 28, 12 * 28, 15 * 28, 18 * 28, 21 * 28
-		//m256i_indices[1] : 1 * 28, 4 * 28, 7 * 28, 10 * 28, 13 * 28, 16 * 28, 19 * 28, 22 * 28
-		//m256i_indices[2] : 2 * 28, 5 * 28, 8 * 28, 11 * 28, 14 * 28, 17 * 28, 20 * 28, 23 * 28
-		const culling::EVERYCULLING_M256I m256i_stride = _mm256_set1_epi32(static_cast<int>(vertexStrideByte));
-		m256i_indices[0] = _mm256_mullo_epi32(m256i_indices[0], m256i_stride);
-		m256i_indices[1] = _mm256_mullo_epi32(m256i_indices[1], m256i_stride);
-		m256i_indices[2] = _mm256_mullo_epi32(m256i_indices[2], m256i_stride);
-	}
-	
+    for (size_t i = 0; i < 3; i++)
+    {
+        std::cout << "Gathering vertices for index " << i << std::endl;
+        size_t index = vertexIndices[currentIndiceIndex + i];
+        std::cout << "Current index: " << index << std::endl;
+        if (index >= verticeCount) {
+            std::cerr << "Error: Index out of bounds: " << index << " >= " << verticeCount << std::endl;
+            return;
+        }
+        float x = vertices[index * vertexStrideFloat];
+        float y = vertices[index * vertexStrideFloat + 1];
+        float z = vertices[index * vertexStrideFloat + 2];
+        
+        // Store the values in the output arrays
+        reinterpret_cast<float*>(&outVerticesX[i])[0] = x;
+        reinterpret_cast<float*>(&outVerticesY[i])[0] = y;
+        reinterpret_cast<float*>(&outVerticesZ[i])[0] = z;
+        
+        std::cout << "Vertex " << i << ": " << x << ", " << y << ", " << z << std::endl;
+    }
 
-	//Gather vertexs
-	//Should consider vertexStride(vertices isn't stored contiguously because generally vertex datas is stored with uv, normal datas...) 
-	//And Should consider z value
-	for (size_t i = 0; i < 3; i++)
-	{
-		outVerticesX[i] = _mm256_i32gather_ps((float*)vertices, m256i_indices[i], 1);
-		outVerticesY[i] = _mm256_i32gather_ps((float*)vertices + 1, m256i_indices[i], 1);
-		outVerticesZ[i] = _mm256_i32gather_ps((float*)vertices + 2, m256i_indices[i], 1);
-	}
+    std::cout << "GatherVertices completed" << std::endl;
 }
 
 void culling::BinTrianglesStage::ConvertToPlatformDepth(culling::EVERYCULLING_M256F* const depth)
@@ -296,59 +283,120 @@ void culling::BinTrianglesStage::BinTriangleThreadJob(const size_t cameraIndex)
 
 void culling::BinTrianglesStage::BinTriangleThreadJobByObjectOrder(const size_t cameraIndex)
 {
-	std::vector<OccluderData> sortedOccluderList = mMaskedOcclusionCulling->mOccluderListManager.GetSortedOccluderList(mCullingSystem->GetCameraWorldPosition(cameraIndex));
+    std::cout << "Entering BinTriangleThreadJobByObjectOrder" << std::endl;
+    std::cout << "Camera index: " << cameraIndex << std::endl;
 
-	std::uint64_t totalBinnedIndiceCount = 0;
-	
-	for (size_t entityInfoIndex = 0; entityInfoIndex < sortedOccluderList.size() && totalBinnedIndiceCount < EVERYCULLING_MAX_BINNED_INDICE_COUNT ; entityInfoIndex++)
-	{
-		culling::OccluderData& occluderInfo = sortedOccluderList[entityInfoIndex];
+    std::vector<OccluderData> sortedOccluderList = mMaskedOcclusionCulling->mOccluderListManager.GetSortedOccluderList(mCullingSystem->GetCameraWorldPosition(cameraIndex));
 
-		culling::EntityBlock* const entityBlock = occluderInfo.mEntityBlock;
-		const size_t entityIndexInEntityBlock = occluderInfo.mEntityIndexInEntityBlock;
-		
-		assert(entityBlock->GetIsCulled(entityIndexInEntityBlock, cameraIndex) == false);
-		
-		std::atomic<std::uint64_t>& atomic_binnedIndiceCountOfCurrentEntity = entityBlock->mVertexDatas[entityIndexInEntityBlock].mBinnedIndiceCount;
+    std::cout << "Sorted occluder list size: " << sortedOccluderList.size() << std::endl;
 
-		const culling::Vec3* const vertices = entityBlock->mVertexDatas[entityIndexInEntityBlock].mVertices;
-		const std::uint64_t verticeCount = entityBlock->mVertexDatas[entityIndexInEntityBlock].mVerticeCount;
-		const std::uint32_t* const indices = entityBlock->mVertexDatas[entityIndexInEntityBlock].mIndices;
-		const std::uint64_t totalIndiceCount = entityBlock->mVertexDatas[entityIndexInEntityBlock].mIndiceCount;
-		const std::uint64_t vertexStride = entityBlock->mVertexDatas[entityIndexInEntityBlock].mVertexStride;
+    std::uint64_t totalBinnedIndiceCount = 0;
+    
+    for (size_t entityInfoIndex = 0; entityInfoIndex < sortedOccluderList.size() && totalBinnedIndiceCount < EVERYCULLING_MAX_BINNED_INDICE_COUNT ; entityInfoIndex++)
+    {
+        culling::OccluderData& occluderInfo = sortedOccluderList[entityInfoIndex];
 
-		std::uint64_t currentBinnedIndiceCountOfCurrentEntity = 0;
+        culling::EntityBlock* const entityBlock = occluderInfo.mEntityBlock;
+        const size_t entityIndexInEntityBlock = occluderInfo.mEntityIndexInEntityBlock;
+        
+        std::cout << "Processing entity " << entityInfoIndex << ":" << std::endl;
+        std::cout << "  EntityBlock pointer: " << (void*)entityBlock << std::endl;
+        std::cout << "  Entity index in block: " << entityIndexInEntityBlock << std::endl;
 
-		while (totalBinnedIndiceCount + currentBinnedIndiceCountOfCurrentEntity < EVERYCULLING_MAX_BINNED_INDICE_COUNT)
-		{
-			static_assert((DEFAULT_BINNED_TRIANGLE_COUNT_PER_LOOP * 3) % 3 == 0);
-			currentBinnedIndiceCountOfCurrentEntity = atomic_binnedIndiceCountOfCurrentEntity.fetch_add(DEFAULT_BINNED_TRIANGLE_COUNT_PER_LOOP * 3, std::memory_order_seq_cst);
-			
-			if (currentBinnedIndiceCountOfCurrentEntity < totalIndiceCount)
-			{
-				const culling::Mat4x4 modelToClipSpaceMatrix = mCullingSystem->GetCameraViewProjectionMatrix(cameraIndex) * entityBlock->GetModelMatrix(entityIndexInEntityBlock);
+        assert(entityBlock->GetIsCulled(entityIndexInEntityBlock, cameraIndex) == false);
+        
+        std::atomic<std::uint64_t>& atomic_binnedIndiceCountOfCurrentEntity = entityBlock->mVertexDatas[entityIndexInEntityBlock].mBinnedIndiceCount;
 
-				const std::uint32_t* const startIndicePtr = indices + currentBinnedIndiceCountOfCurrentEntity;
-				const std::uint64_t indiceCount = EVERYCULLING_MIN(DEFAULT_BINNED_TRIANGLE_COUNT_PER_LOOP * 3, totalIndiceCount - currentBinnedIndiceCountOfCurrentEntity);
+        const culling::Vec3* const vertices = entityBlock->mVertexDatas[entityIndexInEntityBlock].mVertices;
+        const std::uint64_t verticeCount = entityBlock->mVertexDatas[entityIndexInEntityBlock].mVerticeCount;
+        const std::uint32_t* const indices = entityBlock->mVertexDatas[entityIndexInEntityBlock].mIndices;
+        const std::uint64_t totalIndiceCount = entityBlock->mVertexDatas[entityIndexInEntityBlock].mIndiceCount;
+        const std::uint64_t vertexStride = entityBlock->mVertexDatas[entityIndexInEntityBlock].mVertexStride;
 
-				BinTriangles
-				(
-					reinterpret_cast<const float*>(vertices),
-					verticeCount,
-					startIndicePtr,
-					indiceCount,
-					vertexStride,
-					modelToClipSpaceMatrix.data()
-				);
-			}
-			else
-			{
-				break;
-			}
-		}
+        std::uint64_t currentBinnedIndiceCountOfCurrentEntity = 0;
 
-		totalBinnedIndiceCount += EVERYCULLING_MIN(totalIndiceCount, currentBinnedIndiceCountOfCurrentEntity);
-	}
+        while (totalBinnedIndiceCount + currentBinnedIndiceCountOfCurrentEntity < EVERYCULLING_MAX_BINNED_INDICE_COUNT)
+        {
+            static_assert((DEFAULT_BINNED_TRIANGLE_COUNT_PER_LOOP * 3) % 3 == 0);
+            currentBinnedIndiceCountOfCurrentEntity = atomic_binnedIndiceCountOfCurrentEntity.fetch_add(DEFAULT_BINNED_TRIANGLE_COUNT_PER_LOOP * 3, std::memory_order_seq_cst);
+            
+            if (currentBinnedIndiceCountOfCurrentEntity < totalIndiceCount)
+            {
+                const culling::Mat4x4 modelToClipspaceMatrix = mCullingSystem->GetCameraViewProjectionMatrix(cameraIndex) * entityBlock->GetModelMatrix(entityIndexInEntityBlock);
+
+                const std::uint32_t* const startIndicePtr = indices + currentBinnedIndiceCountOfCurrentEntity;
+                const std::uint64_t indiceCount = EVERYCULLING_MIN(DEFAULT_BINNED_TRIANGLE_COUNT_PER_LOOP * 3, totalIndiceCount - currentBinnedIndiceCountOfCurrentEntity);
+
+                std::cout << "Before calling BinTriangles:" << std::endl;
+                std::cout << "vertices address: " << (void*)vertices << std::endl;
+                std::cout << "verticeCount: " << verticeCount << std::endl;
+                std::cout << "startIndicePtr: " << (void*)startIndicePtr << std::endl;
+                std::cout << "indiceCount: " << indiceCount << std::endl;
+                std::cout << "vertexStride: " << vertexStride << std::endl;
+
+                // Call PrintEntityBlockData here
+                entityBlock->PrintEntityBlockData(entityBlock, entityIndexInEntityBlock);
+
+                // Verify checksums
+                uint64_t currentVertexChecksum = culling::calculateChecksum(vertices, verticeCount * sizeof(culling::Vec3));
+                uint64_t currentIndexChecksum = culling::calculateChecksum(indices, totalIndiceCount * sizeof(std::uint32_t));
+                std::cout << "Current vertex checksum: " << currentVertexChecksum << std::endl;
+                std::cout << "Stored vertex checksum: " << entityBlock->mVertexDatas[entityIndexInEntityBlock].mVertexChecksum << std::endl;
+                std::cout << "Current index checksum: " << currentIndexChecksum << std::endl;
+                std::cout << "Stored index checksum: " << entityBlock->mVertexDatas[entityIndexInEntityBlock].mIndexChecksum << std::endl;
+
+                if (currentVertexChecksum != entityBlock->mVertexDatas[entityIndexInEntityBlock].mVertexChecksum ||
+                    currentIndexChecksum != entityBlock->mVertexDatas[entityIndexInEntityBlock].mIndexChecksum) {
+                    std::cerr << "Error: Checksum mismatch detected!" << std::endl;
+                    // You might want to add additional error handling here
+                }
+
+                std::cout << "Before calling BinTriangles:" << std::endl;
+                std::cout << "vertices address: " << (void*)vertices << std::endl;
+                std::cout << "verticeCount: " << verticeCount << std::endl;
+                std::cout << "startIndicePtr: " << (void*)startIndicePtr << std::endl;
+                std::cout << "indiceCount: " << indiceCount << std::endl;
+                std::cout << "vertexStride: " << vertexStride << std::endl;
+                std::cout << "EntityBlock data:" << std::endl;
+                std::cout << "  Vertices address: " << (void*)entityBlock->mVertexDatas[entityIndexInEntityBlock].mVertices << std::endl;
+                std::cout << "  Indices address: " << (void*)entityBlock->mVertexDatas[entityIndexInEntityBlock].mIndices << std::endl;
+                std::cout << "  Vertex count: " << entityBlock->mVertexDatas[entityIndexInEntityBlock].mVerticeCount << std::endl;
+                std::cout << "  Index count: " << entityBlock->mVertexDatas[entityIndexInEntityBlock].mIndiceCount << std::endl;
+                std::cout << "  Vertex stride: " << entityBlock->mVertexDatas[entityIndexInEntityBlock].mVertexStride << std::endl;
+                std::cout << "  Vertex checksum: " << entityBlock->mVertexDatas[entityIndexInEntityBlock].mVertexChecksum << std::endl;
+                std::cout << "  Index checksum: " << entityBlock->mVertexDatas[entityIndexInEntityBlock].mIndexChecksum << std::endl;
+
+                // Unprotect memory before use
+                MemoryUtils::UnprotectMemory((void*)vertices, verticeCount * sizeof(culling::Vec3));
+                MemoryUtils::UnprotectMemory((void*)indices, totalIndiceCount * sizeof(std::uint32_t));
+
+                BinTriangles
+                (
+                    entityBlock,  // Add this line
+                    entityIndexInEntityBlock,
+                    currentBinnedIndiceCountOfCurrentEntity,
+                    reinterpret_cast<const float*>(vertices),
+                    verticeCount,
+                    startIndicePtr,
+                    indiceCount,
+                    vertexStride,
+                    modelToClipspaceMatrix.data()
+                );
+
+                // Protect memory after use
+                MemoryUtils::ProtectMemory((void*)vertices, verticeCount * sizeof(culling::Vec3));
+                MemoryUtils::ProtectMemory((void*)indices, totalIndiceCount * sizeof(std::uint32_t));
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        totalBinnedIndiceCount += EVERYCULLING_MIN(totalIndiceCount, currentBinnedIndiceCountOfCurrentEntity);
+    }
+
+    std::cout << "Exiting BinTriangleThreadJobByObjectOrder" << std::endl;
 }
 
 culling::BinTrianglesStage::BinTrianglesStage(MaskedSWOcclusionCulling* mMOcclusionCulling)
@@ -378,70 +426,161 @@ const char* culling::BinTrianglesStage::GetCullingModuleName() const
 	return "BinTrianglesStage";
 }
 
-EVERYCULLING_FORCE_INLINE void culling::BinTrianglesStage::BinTriangles
+void culling::BinTrianglesStage::BinTriangles
 (
-	const float* const vertices,
-	const uint64_t verticeCount,
-	const std::uint32_t* const vertexIndices,
-	const uint64_t indiceCount,
-	const uint64_t vertexStrideByte,
-	const float* const modelToClipspaceMatrix
+    culling::EntityBlock* const entityBlock,
+    const size_t entityIndex,
+    const size_t binnedTriangleListIndex,
+    const float* const vertices,
+    const size_t verticeCount,
+    const std::uint32_t* const vertexIndices,
+    const size_t indiceCount,
+    const size_t vertexStrideByte,
+    const float* const modelToClipspaceMatrix
 )
 {
-	assert(indiceCount > 0);
+    std::cout << "Entering BinTriangles" << std::endl;
+    std::cout << "EntityBlock pointer: " << (void*)entityBlock << std::endl;
+    std::cout << "Entity index: " << entityIndex << std::endl;
+    std::cout << "Binned triangle list index: " << binnedTriangleListIndex << std::endl;
+    std::cout << "Vertices address: " << (void*)vertices << std::endl;
+    std::cout << "Vertex count: " << verticeCount << std::endl;
+    std::cout << "Vertex indices address: " << (void*)vertexIndices << std::endl;
+    std::cout << "Index count: " << indiceCount << std::endl;
+    std::cout << "Vertex stride (bytes): " << vertexStrideByte << std::endl;
 
-	const uint64_t fetchTriangleCount = EVERYCULLING_MIN(8, indiceCount / 3);
-	assert(fetchTriangleCount != 0);
+    if (entityBlock == nullptr) {
+        std::cerr << "Error: EntityBlock is null" << std::endl;
+        return;
+    }
 
-	// First 4 bits show if traingle is valid
-	// Current Value : 00000000 00000000 00000000 11111111
-	std::uint32_t triangleCullMask = (1 << fetchTriangleCount) - 1;
+    if (entityIndex >= entityBlock->mCurrentEntityCount) {
+        std::cerr << "Error: Entity index out of bounds" << std::endl;
+        return;
+    }
+	// Assuming EntityBlock has a member variable mVertexDatas that is an array of VertexData
+	const auto& vertexData = entityBlock->mVertexDatas[entityIndex];
+        
+    std::cout << "Stored vertices address: " << (void*)vertexData.mVertices << std::endl;
+    std::cout << "Stored vertex count: " << vertexData.mVerticeCount << std::endl;
+    std::cout << "Stored indices address: " << (void*)vertexData.mIndices << std::endl;
+    std::cout << "Stored index count: " << vertexData.mIndiceCount << std::endl;
+    std::cout << "Stored vertex stride: " << vertexData.mVertexStride << std::endl;
 
+    if (vertices != reinterpret_cast<const float*>(vertexData.mVertices)) {
+        std::cerr << "Error: Vertex pointer mismatch" << std::endl;
+        return;
+    }
 
-	//Why Size of array is 3?
-	//A culling::EVERYCULLING_M256F can have 8 floating-point
-	//A TwoDTriangle have 3 point
-	//So If you have just one culling::EVERYCULLING_M256F variable, a floating-point is unused.
-	//Not to make unused space, 12 floating point is required per axis
-	// culling::EVERYCULLING_M256F * 3 -> 8 TwoDTriangle with no unused space
+    if (vertexIndices != vertexData.mIndices) {
+        std::cerr << "Error: Index pointer mismatch" << std::endl;
+        return;
+    }
 
-	//We don't need z value in Binning stage!!!
-	// Triangle's First Vertex X is in ndcSpaceVertexX[0][0]
-	// Triangle's Second Vertex X is in ndcSpaceVertexX[0][1]
-	// Triangle's Third Vertex X is in ndcSpaceVertexX[0][2]
-	culling::EVERYCULLING_M256F ndcSpaceVertexX[3], ndcSpaceVertexY[3], ndcSpaceVertexZ[3], oneDividedByW[3];
+    if (verticeCount != vertexData.mVerticeCount) {
+        std::cerr << "Error: Vertex count mismatch" << std::endl;
+        return;
+    }
 
-	//Gather Vertex with indice
-	//WE ARRIVE AT MODEL SPACE COORDINATE!
-	GatherVertices(vertices, verticeCount, vertexIndices, indiceCount, 0, vertexStrideByte, fetchTriangleCount, ndcSpaceVertexX, ndcSpaceVertexY, ndcSpaceVertexZ);
+    if (indiceCount != vertexData.mIndiceCount) {
+        std::cerr << "Error: Index count mismatch" << std::endl;
+        return;
+    }
 
+    if (vertexStrideByte != vertexData.mVertexStride) {
+        std::cerr << "Error: Vertex stride mismatch" << std::endl;
+        return;
+    }
 
-	//////////////////////////////////////////////////
+    // Print first few vertices and indices
+    std::cout << "First few vertices:" << std::endl;
+    for (size_t i = 0; i < std::min(verticeCount, size_t(5)); ++i) {
+        std::cout << "Vertex " << i << ": " 
+                  << reinterpret_cast<const culling::Vec3*>(vertices)[i].x << ", " 
+                  << reinterpret_cast<const culling::Vec3*>(vertices)[i].y << ", " 
+                  << reinterpret_cast<const culling::Vec3*>(vertices)[i].z << std::endl;
+    }
+    std::cout << "First few indices:" << std::endl;
+    for (size_t i = 0; i < std::min(indiceCount, size_t(10)); ++i) {
+        std::cout << "Index " << i << ": " << vertexIndices[i] << std::endl;
+    }
 
+	// Verify checksums
+    uint64_t currentVertexChecksum = culling::calculateChecksum(vertices, verticeCount * sizeof(culling::Vec3));
+    uint64_t currentIndexChecksum = culling::calculateChecksum(vertexIndices, indiceCount * sizeof(std::uint32_t));
+    std::cout << "Current vertex checksum: " << currentVertexChecksum << std::endl;
+    std::cout << "Stored vertex checksum: " << vertexData.mVertexChecksum << std::endl;
+    std::cout << "Current index checksum: " << currentIndexChecksum << std::endl;
+    std::cout << "Stored index checksum: " << vertexData.mIndexChecksum << std::endl;
 
-	for (int i = 0; i < 3; i++)
-	{
-		oneDividedByW[i] = culling::EVERYCULLING_M256F_MUL_AND_ADD(ndcSpaceVertexX[i], _mm256_set1_ps(modelToClipspaceMatrix[3]), culling::EVERYCULLING_M256F_MUL_AND_ADD(ndcSpaceVertexY[i], _mm256_set1_ps(modelToClipspaceMatrix[7]), culling::EVERYCULLING_M256F_MUL_AND_ADD(ndcSpaceVertexZ[i], _mm256_set1_ps(modelToClipspaceMatrix[11]), _mm256_set1_ps(modelToClipspaceMatrix[15]))));
-	}
+    if (currentVertexChecksum != vertexData.mVertexChecksum ||
+        currentIndexChecksum != vertexData.mIndexChecksum) {
+        std::cerr << "Error: Checksum mismatch detected!" << std::endl;
+        // You might want to add additional error handling here
+    }
 
-	const culling::EVERYCULLING_M256F positiveWMask = ComputePositiveWMask(oneDividedByW);
+    // Add error checking
+    if (vertices == nullptr || vertexIndices == nullptr || modelToClipspaceMatrix == nullptr) {
+        std::cerr << "Error: Null pointer passed to BinTriangles" << std::endl;
+        return;
+    }
 
-	const culling::EVERYCULLING_M256I allOne = _mm256_set1_epi64x(0xFFFFFFFFFFFFFFFF);
-	const culling::EVERYCULLING_M256F negativeWMask = _mm256_xor_ps(positiveWMask, *reinterpret_cast<const __m256*>(&allOne));
-	triangleCullMask &= _mm256_movemask_ps(*reinterpret_cast<const culling::EVERYCULLING_M256F*>(&positiveWMask));
-	if (triangleCullMask == 0x00000000)
-	{
-		return;
-	}
+    std::cout << "Pointers are not null" << std::endl;
 
-	/*
-	for (int i = 0; i < 3; i++)
-	{
-		const culling::EVERYCULLING_M256F point_W_IsNegativeValue = _mm256_cmp_ps(oneDividedByW[i], _mm256_set1_ps(std::numeric_limits<float>::epsilon()), _CMP_LT_OQ);
-		oneDividedByW[i] = _mm256_blendv_ps(oneDividedByW[i], _mm256_set1_ps(1.0f), point_W_IsNegativeValue);
-	}
-	*/
+    if (verticeCount == 0 || indiceCount == 0 || vertexStrideByte == 0) {
+        std::cerr << "Error: Invalid count or stride in BinTriangles" << std::endl;
+        return;
+    }
 
+    std::cout << "Counts and stride are valid" << std::endl;
+
+    assert(indiceCount > 0);
+
+    std::cout << "Assert passed" << std::endl;
+
+    const uint64_t fetchTriangleCount = EVERYCULLING_MIN(8, indiceCount / 3);
+    assert(fetchTriangleCount != 0);
+
+    std::cout << "fetchTriangleCount: " << fetchTriangleCount << std::endl;
+
+    // First 4 bits show if traingle is valid
+    // Current Value : 00000000 00000000 00000000 11111111
+    std::uint32_t triangleCullMask = (1 << fetchTriangleCount) - 1;
+
+    std::cout << "triangleCullMask: " << triangleCullMask << std::endl;
+
+    //Why Size of array is 3?
+    //A culling::EVERYCULLING_M256F can have 8 floating-point
+    //A TwoDTriangle have 3 point
+    //So If you have just one culling::EVERYCULLING_M256F variable, a floating-point is unused.
+    //Not to make unused space, 12 floating point is required per axis
+    // culling::EVERYCULLING_M256F * 3 -> 8 TwoDTriangle with no unused space
+
+    //We don't need z value in Binning stage!!!
+    // Triangle's First Vertex X is in ndcSpaceVertexX[0][0]
+    // Triangle's Second Vertex X is in ndcSpaceVertexX[0][1]
+    // Triangle's Third Vertex X is in ndcSpaceVertexX[0][2]
+    culling::EVERYCULLING_M256F ndcSpaceVertexX[3], ndcSpaceVertexY[3], ndcSpaceVertexZ[3], oneDividedByW[3];
+
+    std::cout << "Arrays declared" << std::endl;
+
+    //Gather Vertex with indice
+    //WE ARRIVE AT MODEL SPACE COORDINATE!
+    GatherVertices(vertices, verticeCount, vertexIndices, indiceCount, 0, vertexStrideByte, fetchTriangleCount, ndcSpaceVertexX, ndcSpaceVertexY, ndcSpaceVertexZ);
+    std::cout << "GatherVertices completed" << std::endl;
+
+    std::cout << "First few vertices:" << std::endl;
+    for (size_t i = 0; i < std::min(verticeCount, size_t(5)); ++i) {
+        std::cout << "Vertex " << i << ": " 
+                  << reinterpret_cast<const culling::Vec3*>(vertices)[i].x << ", " 
+                  << reinterpret_cast<const culling::Vec3*>(vertices)[i].y << ", " 
+                  << reinterpret_cast<const culling::Vec3*>(vertices)[i].z << std::endl;
+    }
+
+    std::cout << "First few indices:" << std::endl;
+    for (size_t i = 0; i < std::min(indiceCount, size_t(5)); ++i) {
+        std::cout << "Index " << i << ": " << vertexIndices[i] << std::endl;
+    }
 
 	//////////////////////////////////////////////////
 
@@ -671,5 +810,7 @@ EVERYCULLING_FORCE_INLINE void culling::BinTrianglesStage::BinTriangles
 			outBinBoundingBoxMaxY
 		);
 	}
+
+	std::cout << "Exiting BinTriangles" << std::endl;
 }
 

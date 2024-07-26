@@ -2,6 +2,7 @@
 
 #include <array>
 #include <atomic>
+#include <iostream>
 
 #include "../EveryCullingCore.h"
 #include "../DataType/EntityBlock.h"
@@ -52,7 +53,17 @@ namespace culling
 			return mCullJobState.mFinishedThreadCount[cameraIndex];
 		}
 
-
+		virtual void DebugOutputCullingResult(const size_t cameraIndex, culling::EntityBlock* const entityBlock) const
+		{
+			if (mCullingSystem->IsDebugOutputEnabled())
+			{
+				for (size_t entityIndex = 0; entityIndex < entityBlock->mCurrentEntityCount; entityIndex++)
+				{
+					std::cout << "Culling in " << GetCullingModuleName() << ": Entity " << entityIndex 
+							  << " culled: " << entityBlock->GetIsCulled(entityIndex, cameraIndex) << std::endl;
+				}
+			}
+		}
 
 		virtual void OnSetViewProjectionMatrix(const size_t cameraIndex, const culling::Mat4x4& cameraViewProjectionMatrix)
 		{

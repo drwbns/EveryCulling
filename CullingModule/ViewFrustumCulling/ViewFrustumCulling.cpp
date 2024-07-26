@@ -59,6 +59,8 @@ void culling::ViewFrustumCulling::CullBlockEntityJob
 	const size_t cameraIndex, const unsigned long long currentTickCount
 )
 {
+
+	
 	while(true)
 	{
 		culling::EntityBlock* const nextEntityBlock = GetNextEntityBlock(cameraIndex);
@@ -66,6 +68,7 @@ void culling::ViewFrustumCulling::CullBlockEntityJob
 		if(nextEntityBlock != nullptr)
 		{
 			DoViewFrustumCulling(cameraIndex, nextEntityBlock);
+			DebugOutputCullingResult(cameraIndex, nextEntityBlock);  // Add this line
 		}
 		else
 		{
@@ -158,3 +161,15 @@ void culling::ViewFrustumCulling::OnSetViewProjectionMatrix(const size_t cameraI
 	ExtractSIMDPlanesFromViewProjectionMatrix(cameraViewProjectionMatrix, mSIMDFrustumPlanes[cameraIndex].mFrustumPlanes, true);
 }
 
+void culling::ViewFrustumCulling::DebugOutputCullingResult(const size_t cameraIndex, culling::EntityBlock* const entityBlock) const
+{
+    for (size_t entityIndex = 0; entityIndex < entityBlock->mCurrentEntityCount; entityIndex++)
+    {
+        std::cout << "View Frustum Culling: Entity " << entityIndex 
+                  << " culled: " << entityBlock->GetIsCulled(entityIndex, cameraIndex) 
+                  << " Position: " << entityBlock->mWorldPositionAndWorldBoundingSphereRadius[entityIndex].GetPosition().x
+                  << ", " << entityBlock->mWorldPositionAndWorldBoundingSphereRadius[entityIndex].GetPosition().y
+                  << ", " << entityBlock->mWorldPositionAndWorldBoundingSphereRadius[entityIndex].GetPosition().z
+                  << std::endl;
+    }
+}

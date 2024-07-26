@@ -10,6 +10,24 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <filesystem>
+
+GLuint CreateShaderProgram();
+
+struct Model;
+
+void RenderModel(const Model& model, const glm::mat4& viewProjection);
+
+void CheckGLError(const char* function);
+
+struct Model {
+    GLuint vao;
+    GLuint vbo;
+    GLuint ebo;
+    GLuint shaderProgram;
+    GLuint indexCount;
+    glm::mat4 modelMatrix;
+};
 
 // Function to create a view matrix
 glm::mat4 CreateViewMatrix(const glm::vec3& cameraPos, const glm::vec3& cameraTarget, const glm::vec3& upVector) {
@@ -31,19 +49,165 @@ culling::Mat4x4 ConvertToCullingMat4x4(const glm::mat4& mat) {
     return result;
 }
 
-void LoadModels() {
-    // Load your models here
+culling::Vec3 ExtractTranslationFromMatrix(const glm::mat4& mat) {
+    return culling::Vec3{mat[3][0], mat[3][1], mat[3][2]};
 }
 
-void RenderModels(const culling::EveryCulling& cullingSystem) {
+void LoadModels(std::vector<Model>& models, culling::EveryCulling& cullingSystem) {
+    std::cout << "Entering LoadModels function" << std::endl;
+
+    try {
+        // Load your models here
+        // This is a placeholder implementation for a single triangle model
+        Model triangleModel;
+        
+        glGenVertexArrays(1, &triangleModel.vao);
+        glGenBuffers(1, &triangleModel.vbo);
+        glGenBuffers(1, &triangleModel.ebo);
+
+        glBindVertexArray(triangleModel.vao);
+
+        // Define vertex data for a simple triangle
+        float vertices[] = {
+            -0.5f, -0.5f, -3.0f,
+             0.5f, -0.5f, -3.0f,
+             0.0f,  0.5f, -3.0f
+        };
+
+        glBindBuffer(GL_ARRAY_BUFFER, triangleModel.vbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+
+        // Define index data
+        unsigned int indices[] = {
+            0, 1, 2
+        };
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, triangleModel.ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+        triangleModel.indexCount = 3;
+        triangleModel.shaderProgram = CreateShaderProgram();
+        triangleModel.modelMatrix = glm::mat4(1.0f); // Identity matrix
+
+        models.push_back(triangleModel);
+
+        // Add the triangle to the culling system
+        culling::EntityBlockViewer entityViewer = cullingSystem.AllocateNewEntity();
+        if (entityViewer.IsValid()) {
+            std::cout << "EntityBlockViewer is valid" << std::endl;
+
+            // Calculate AABB for the triangle
+            glm::vec3 min = glm::vec3(vertices[0], vertices[1], vertices[2]);
+            glm::vec3 max = min;
+            for (int i = 1; i < 3; ++i) {
+                min = glm::min(min, glm::vec3(vertices[i*3], vertices[i*3+1], vertices[i*3+2]));
+                max = glm::max(max, glm::vec3(vertices[i*3], vertices[i*3+1], vertices[i*3+2]));
+            }
+
+            // Convert glm::mat4 to culling::Mat4x4
+            culling::Mat4x4 cullingModelMatrix = ConvertToCullingMat4x4(triangleModel.modelMatrix);
+
+            culling::Vec3 center((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f, (min.z + max.z) * 0.5f);
+            culling::Vec3 aabbMin(min.x, min.y, min.z);
+            culling::Vec3 aabbMax(max.x, max.y, max.z);
+
+            // Create culling::Vec3 array for vertices
+            std::vector<culling::Vec3> cullingVertices;
+            for (int i = 0; i < 3; ++i) {
+                cullingVertices.push_back(culling::Vec3(vertices[i*3], vertices[i*3+1], vertices[i*3+2]));
+            }
+
+            // Create index array
+            std::vector<std::uint32_t> cullingIndices = {0, 1, 2};
+
+            std::cout << "Before UpdateEntityData" << std::endl;
+            entityViewer.UpdateEntityData(
+                center.data(),
+                aabbMin.data(),
+                aabbMax.data(),
+                cullingModelMatrix.data()
+            );
+            std::cout << "After UpdateEntityData" << std::endl;
+
+            std::cout << "cullingVertices address: " << (void*)cullingVertices.data() << std::endl;
+            std::cout << "cullingVertices capacity: " << cullingVertices.capacity() << std::endl;
+            
+            if (cullingVertices.empty()) {
+                std::cerr << "Error: cullingVertices is empty" << std::endl;
+            } else {
+                std::cout << "cullingVertices is not empty" << std::endl;
+                std::cout << "Vertex count: " << cullingVertices.size() << std::endl;
+            }
+
+            // Print debug information
+            std::cout << "Entity added to culling system:" << std::endl;
+            std::cout << "Vertex count: " << cullingVertices.size() << std::endl;
+            std::cout << "Index count: " << cullingIndices.size() << std::endl;
+            for (size_t i = 0; i < std::min(cullingVertices.size(), size_t(5)); ++i) {
+                std::cout << "Vertex " << i << ": " << cullingVertices[i].x << ", " << cullingVertices[i].y << ", " << cullingVertices[i].z << std::endl;
+            }
+            for (size_t i = 0; i < std::min(cullingIndices.size(), size_t(10)); ++i) {
+                std::cout << "Index " << i << ": " << cullingIndices[i] << std::endl;
+            }
+
+            std::cout << "Before calling SetMeshVertexData" << std::endl;
+            entityViewer.SetMeshVertexData(
+                cullingVertices.data(),
+                cullingVertices.size(),
+                cullingIndices.data(),
+                cullingIndices.size(),
+                sizeof(culling::Vec3)
+            );
+            std::cout << "After calling SetMeshVertexData" << std::endl;
+        } else {
+            std::cerr << "Failed to allocate entity for culling system" << std::endl;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Exception caught in LoadModels: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Unknown exception caught in LoadModels" << std::endl;
+    }
+
+    std::cout << "Exiting LoadModels function" << std::endl;
+}
+
+void RenderModels(const culling::EveryCulling& cullingSystem, const std::vector<Model>& models, const glm::mat4& viewProjection) {
     const auto& entityBlocks = cullingSystem.GetActiveEntityBlockList();
+    std::cout << "Entity blocks to render: " << entityBlocks.size() << std::endl;
+
     for (const auto& block : entityBlocks) {
+        std::cout << "Entities in block: " << block->mCurrentEntityCount << std::endl;
         for (size_t i = 0; i < block->mCurrentEntityCount; ++i) {
+            std::cout << "Entity " << i << " culled: " << block->GetIsCulled(i, 0) << std::endl;
             if (!block->GetIsCulled(i, 0)) {
                 // Render the entity
+                if (i < models.size()) {
+                    RenderModel(models[i], viewProjection);
+                    std::cout << "Rendering model " << i << std::endl;
+                }
             }
         }
     }
+}
+
+void RenderModel(const Model& model, const glm::mat4& viewProjection) {
+    glUseProgram(model.shaderProgram);
+    
+    glm::mat4 mvp = viewProjection * model.modelMatrix;
+    GLuint mvpLoc = glGetUniformLocation(model.shaderProgram, "viewProjection");
+    if (mvpLoc == GL_INVALID_INDEX) {
+        std::cerr << "Failed to get uniform location for viewProjection" << std::endl;
+    }
+    glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
+
+    std::cout << "Rendering model with " << model.indexCount << " indices" << std::endl;
+
+    glBindVertexArray(model.vao);
+    glDrawElements(GL_TRIANGLES, model.indexCount, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
 }
 
 void InitializeCullingSystem(culling::EveryCulling& cullingSystem) {
@@ -96,6 +260,7 @@ std::string ReadShaderFile(const std::string& filePath) {
     std::ifstream shaderFile(filePath);
     if (!shaderFile.is_open()) {
         std::cerr << "Failed to open shader file: " << filePath << std::endl;
+        std::cerr << "Current working directory: " << std::filesystem::current_path() << std::endl;
         return "";
     }
 
@@ -107,8 +272,9 @@ std::string ReadShaderFile(const std::string& filePath) {
 }
 
 GLuint CreateShaderProgram() {
-    std::string vertexShaderSource = ReadShaderFile("vertex_shader.glsl");
-    std::string fragmentShaderSource = ReadShaderFile("fragment_shader.glsl");
+    std::string exePath = std::filesystem::current_path().string();
+    std::string vertexShaderSource = ReadShaderFile(exePath + "/shaders/vertex_shader.glsl");
+    std::string fragmentShaderSource = ReadShaderFile(exePath + "/shaders/fragment_shader.glsl");
 
     GLuint vertexShader = CompileShader(GL_VERTEX_SHADER, vertexShaderSource.c_str());
     GLuint fragmentShader = CompileShader(GL_FRAGMENT_SHADER, fragmentShaderSource.c_str());
@@ -158,23 +324,13 @@ void InitializeOpenGL() {
         exit(EXIT_FAILURE);
     }
 
-    glEnable(GL_DEPTH_TEST);
-}
-
-void RenderModel(const Model& model, const glm::mat4& viewProjection) {
-    glUseProgram(model.shaderProgram);
-
-    GLint mvpLoc = glGetUniformLocation(model.shaderProgram, "MVP");
-    glm::mat4 mvp = viewProjection * model.modelMatrix;
-    glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
-
-    glBindVertexArray(model.vao);
-    glDrawElements(GL_TRIANGLES, model.indexCount, GL_UNSIGNED_INT, 0);
-    glBindVertexArray(0);
+    // Temporarily disable depth testing
+    // glEnable(GL_DEPTH_TEST);
 }
 
 void RenderLoop(GLFWwindow* window, culling::EveryCulling& cullingSystem, const std::vector<Model>& models) {
     while (!glfwWindowShouldClose(window)) {
+        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Update camera position and view-projection matrix
@@ -183,83 +339,31 @@ void RenderLoop(GLFWwindow* window, culling::EveryCulling& cullingSystem, const 
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
         glm::mat4 viewProjection = projection * view;
 
-        // Update culling system
-        culling::EveryCulling::GlobalDataForCullJob cullingSettingParameters;
-        cullingSettingParameters.mViewProjectionMatrix = ConvertToCullingMat4x4(viewProjection);
-        cullingSettingParameters.mCameraWorldPosition = culling::Vec3{ cameraPos.x, cameraPos.y, cameraPos.z };
-        cullingSettingParameters.mFieldOfViewInDegree = 45.0f;
-        cullingSettingParameters.mCameraNearPlaneDistance = 0.1f;
-        cullingSettingParameters.mCameraFarPlaneDistance = 100.0f;
-        cullingSettingParameters.mCameraRotation = culling::Vec4{ 0.0f, 0.0f, 0.0f, 1.0f };
-
-        cullingSystem.UpdateGlobalDataForCullJob(0, cullingSettingParameters);
+        std::cout << "Before culling: Active entity blocks: " << cullingSystem.GetActiveEntityBlockCount() << std::endl;
 
         // Perform culling
         cullingSystem.PreCullJob();
         cullingSystem.ThreadCullJob(0, cullingSystem.GetTickCount());
 
+        std::cout << "After culling: Active entity blocks: " << cullingSystem.GetActiveEntityBlockCount() << std::endl;
+
         // Render visible models
-        const auto& entityBlocks = cullingSystem.GetActiveEntityBlockList();
-        for (const auto& block : entityBlocks) {
-            for (size_t i = 0; i < block->mCurrentEntityCount; ++i) {
-                if (!block->GetIsCulled(i, 0)) {
-                    // Assuming the model index corresponds to the entity index
-                    if (i < models.size()) {
-                        RenderModel(models[i], viewProjection);
-                    }
-                }
-            }
-        }
+        RenderModels(cullingSystem, models, viewProjection);
+
+        // Add debug output
+        std::cout << "Rendering triangle at position: " 
+                  << models[0].modelMatrix[3][0] << ", " 
+                  << models[0].modelMatrix[3][1] << ", " 
+                  << models[0].modelMatrix[3][2] << std::endl;
 
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 }
 
-void LoadModels(std::vector<Model>& models) {
-    // Load your models here
-    // This is a placeholder implementation
-    GLuint vao, vbo, ebo;
-    glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
-    glGenBuffers(1, &ebo);
-
-    glBindVertexArray(vao);
-
-    // Define vertex data for a simple triangle
-    float vertices[] = {
-        -0.5f, -0.5f, 0.0f,
-         0.5f, -0.5f, 0.0f,
-         0.0f,  0.5f, 0.0f
-    };
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    // Define index data
-    unsigned int indices[] = {
-        0, 1, 2
-    };
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-    glBindVertexArray(0);
-
-    GLuint shaderProgram = CreateShaderProgram();
-
-    models.emplace_back(vao, shaderProgram, 3, glm::mat4(1.0f));
+void CheckGLError(const char* function) {
+    GLenum error;
+    while ((error = glGetError()) != GL_NO_ERROR) {
+        std::cerr << "OpenGL error in " << function << ": " << error << std::endl;
+    }
 }
-
-struct Model {
-    GLuint vao;           // Vertex Array Object
-    GLuint shaderProgram; // Shader program ID
-    GLsizei indexCount;   // Number of indices for drawing
-    glm::mat4 modelMatrix; // Model's transformation matrix
-
-    Model(GLuint vao, GLuint shaderProgram, GLsizei indexCount, const glm::mat4& modelMatrix)
-        : vao(vao), shaderProgram(shaderProgram), indexCount(indexCount), modelMatrix(modelMatrix) {}
-};

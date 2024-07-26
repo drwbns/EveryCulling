@@ -35,6 +35,8 @@ namespace culling
 		EntityBlockViewer(EntityBlockViewer&&) noexcept;
 		EntityBlockViewer& operator=(EntityBlockViewer&&)noexcept ;
 
+		bool IsEntityBlockValid() const;
+
 		EVERYCULLING_FORCE_INLINE bool IsValid() const
 		{
 			return (mTargetEntityBlock != nullptr) && (mEntityIndexInBlock != (std::uint64_t)-1);
@@ -95,6 +97,8 @@ namespace culling
 			const std::uint64_t indiceCount,
 			const std::uint64_t verticeStride
 		);
+
+
 		
 		EVERYCULLING_FORCE_INLINE const culling::VertexData& GetVertexData() const
 		{
@@ -158,13 +162,39 @@ namespace culling
 		{
 			assert(IsValid() == true);
 
-			if (IsValid() == true)
+			std::cout << "Entering UpdateEntityData" << std::endl;
+			std::cout << "this pointer: " << (void*)this << std::endl;
+			std::cout << "mTargetEntityBlock pointer: " << (void*)mTargetEntityBlock << std::endl;
+			std::cout << "mEntityIndexInBlock: " << mEntityIndexInBlock << std::endl;
+
+			if (IsValid() && IsEntityBlockValid())
 			{
 				SetObjectWorldPosition(entityWorldPositionVec3);
 				SetAABBWorldPosition(aabbMinWorldPositionVec3, aabbMaxWorldPositionVec3);
 
 				SetModelMatrix(entityModelMatrix4x4);
+
+				std::cout << "After updating entity data:" << std::endl;
+				std::cout << "mTargetEntityBlock->mCurrentEntityCount: " << mTargetEntityBlock->mCurrentEntityCount << std::endl;
+				std::cout << "mTargetEntityBlock->mVertexDatas pointer: " << (void*)mTargetEntityBlock->mVertexDatas << std::endl;
+				if (mTargetEntityBlock->mVertexDatas != nullptr)
+				{
+					std::cout << "Stored vertices address: " << (void*)mTargetEntityBlock->mVertexDatas[mEntityIndexInBlock].mVertices << std::endl;
+					std::cout << "Stored vertex count: " << mTargetEntityBlock->mVertexDatas[mEntityIndexInBlock].mVerticeCount << std::endl;
+					std::cout << "Stored indices address: " << (void*)mTargetEntityBlock->mVertexDatas[mEntityIndexInBlock].mIndices << std::endl;
+					std::cout << "Stored index count: " << mTargetEntityBlock->mVertexDatas[mEntityIndexInBlock].mIndiceCount << std::endl;
+					std::cout << "Stored vertex stride: " << mTargetEntityBlock->mVertexDatas[mEntityIndexInBlock].mVertexStride << std::endl;
+				}
+				else
+				{
+					std::cerr << "Error: mTargetEntityBlock->mVertexDatas is null" << std::endl;
+				}
 			}
+			else
+			{
+				std::cerr << "Error: EntityBlockViewer is not valid in UpdateEntityData" << std::endl;
+			}
+			std::cout << "Exiting UpdateEntityData" << std::endl;
 		}
 
 	};

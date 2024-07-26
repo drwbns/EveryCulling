@@ -130,11 +130,14 @@ namespace culling
 		/// <param name="modelToClipspaceMatrix"></param>
 		EVERYCULLING_FORCE_INLINE void BinTriangles
 		(
+			culling::EntityBlock* const entityBlock,
+			const size_t entityIndex,
+			const size_t binnedTriangleListIndex,
 			const float* const vertices,
-			const uint64_t verticeCount,
+			const size_t verticeCount,
 			const std::uint32_t* const vertexIndices,
-			const uint64_t indiceCount,
-			const uint64_t vertexStrideByte,
+			const size_t indiceCount,
+			const size_t vertexStrideByte,
 			const float* const modelToClipspaceMatrix
 		);
 
@@ -158,4 +161,3 @@ namespace culling
 		const char* GetCullingModuleName() const override;
 	};
 }
-

@@ -231,7 +231,17 @@ namespace culling
 		void SetEnabledCullingModule(const CullingModuleType cullingModuleType, const bool isEnabled);
 		std::uint32_t GetRunningThreadCount() const;
 
+		void SetDebugOutput(bool enable)
+		{
+			mDebugOutputEnabled = enable;
+		}
+
+		bool IsDebugOutputEnabled() const
+		{
+			return mDebugOutputEnabled;
+		}
+
+	private:
+		bool mDebugOutputEnabled = false;
 	};
 }
-
-
