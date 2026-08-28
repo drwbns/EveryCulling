@@ -122,6 +122,15 @@ namespace culling
 
 		void SetCameraCount(const size_t cameraCount);
 
+		/// <summary>
+		/// Reallocates anything sized from the screen, for when the window is
+		/// resized. Entities stay registered, unlike recreating the culling
+		/// system. Only safe when no culling job is running.
+		///
+		/// The size is rounded down to whole tiles.
+		/// </summary>
+		void SetResolution(const std::uint32_t width, const std::uint32_t height);
+
 		unsigned long long GetTickCount() const;
 		
 		struct GlobalDataForCullJob

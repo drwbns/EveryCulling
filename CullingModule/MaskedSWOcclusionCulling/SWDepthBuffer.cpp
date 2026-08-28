@@ -36,28 +36,52 @@ void culling::Tile::Reset(const unsigned long long currentTickCount)
 
 
 culling::SWDepthBuffer::SWDepthBuffer(std::uint32_t width, std::uint32_t height)
-	: 
+	:
 	mResolution{
-	width, height,
-	height / EVERYCULLING_TILE_HEIGHT,width / EVERYCULLING_TILE_WIDTH,
 	0, 0,
-	( (width % EVERYCULLING_TILE_WIDTH) > 0 ? width + (width - width % EVERYCULLING_TILE_WIDTH) : width ) - EVERYCULLING_TILE_WIDTH,
-	( (height % EVERYCULLING_TILE_HEIGHT) > 0 ? height + (height - height % EVERYCULLING_TILE_HEIGHT) : height ) - EVERYCULLING_TILE_HEIGHT,
-	
-	_mm256_set1_ps(static_cast<float>(width * 0.5f)),
-	_mm256_set1_ps(static_cast<float>(height * 0.5f)),
-	_mm256_set1_ps(static_cast<float>(width)),
-	_mm256_set1_ps(static_cast<float>(height))
+	0, 0,
+	0, 0,
+	0, 0,
+	_mm256_set1_ps(0.0f),
+	_mm256_set1_ps(0.0f),
+	_mm256_set1_ps(0.0f),
+	_mm256_set1_ps(0.0f)
 	},
-	mTiles(nullptr)
+	mTiles(nullptr),
+	mTileCount(0)
+{
+	Resize(width, height);
+}
+
+void culling::SWDepthBuffer::Resize(const std::uint32_t width, const std::uint32_t height)
 {
 	//"DepthBuffer's size should be multiple of EVERYCULLING_TILE_WIDTH"
-	assert(mResolution.mWidth % EVERYCULLING_TILE_WIDTH == 0);
+	assert(width % EVERYCULLING_TILE_WIDTH == 0);
 	//"DepthBuffer's size should be multiple of EVERYCULLING_TILE_HEIGHT"
-	assert(mResolution.mHeight % EVERYCULLING_TILE_HEIGHT == 0);
+	assert(height % EVERYCULLING_TILE_HEIGHT == 0);
 
-	
+	mResolution = Resolution
+	{
+		width, height,
+		height / EVERYCULLING_TILE_HEIGHT, width / EVERYCULLING_TILE_WIDTH,
+		0, 0,
+		( (width % EVERYCULLING_TILE_WIDTH) > 0 ? width + (width - width % EVERYCULLING_TILE_WIDTH) : width ) - EVERYCULLING_TILE_WIDTH,
+		( (height % EVERYCULLING_TILE_HEIGHT) > 0 ? height + (height - height % EVERYCULLING_TILE_HEIGHT) : height ) - EVERYCULLING_TILE_HEIGHT,
+
+		_mm256_set1_ps(static_cast<float>(width * 0.5f)),
+		_mm256_set1_ps(static_cast<float>(height * 0.5f)),
+		_mm256_set1_ps(static_cast<float>(width)),
+		_mm256_set1_ps(static_cast<float>(height))
+	};
+
 	const size_t tileCount = static_cast<size_t>(mResolution.mRowTileCount) * static_cast<size_t>(mResolution.mColumnTileCount);
+
+	if (mTiles != nullptr)
+	{
+		delete[] mTiles;
+		mTiles = nullptr;
+	}
+
 	mTiles = new Tile[tileCount];
 	mTileCount = tileCount;
 
@@ -71,13 +95,11 @@ culling::SWDepthBuffer::SWDepthBuffer(std::uint32_t width, std::uint32_t height)
 		}
 	}
 
-	//test
 	for(size_t i = 0 ; i < tileCount ; i++)
 	{
 		assert(mTiles[i].mLeftBottomTileOrginX != 0xFFFFFFFF);
 		assert(mTiles[i].mLeftBottomTileOrginY != 0xFFFFFFFF);
 	}
-
 }
 
 culling::SWDepthBuffer::~SWDepthBuffer()

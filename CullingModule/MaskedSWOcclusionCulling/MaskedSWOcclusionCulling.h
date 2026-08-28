@@ -73,6 +73,12 @@ namespace culling
 		);
 	
 		void ResetState(const unsigned long long currentTickCount);
+
+		/// <summary>
+		/// Reallocates the software depth buffer for a new screen size. Only safe
+		/// when no culling job is running.
+		/// </summary>
+		void Resize(const std::uint32_t width, const std::uint32_t height);
 		void CullBlockEntityJob(const size_t cameraIndex, const unsigned long long currentTickCount) override;
 		const char* GetCullingModuleName() const override;
 

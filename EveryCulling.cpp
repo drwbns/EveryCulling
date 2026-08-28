@@ -464,3 +464,21 @@ size_t culling::EveryCulling::GetActiveEntityBlockCount() const
 {
 	return GetActiveEntityBlockList().size();
 }
+
+void culling::EveryCulling::SetResolution(const std::uint32_t width, const std::uint32_t height)
+{
+	// The software depth buffer is tiled, so it can only take whole tiles.
+	// Rounding down keeps it inside the window rather than sampling past it.
+	const std::uint32_t tiledWidth = (width / EVERYCULLING_TILE_WIDTH) * EVERYCULLING_TILE_WIDTH;
+	const std::uint32_t tiledHeight = (height / EVERYCULLING_TILE_HEIGHT) * EVERYCULLING_TILE_HEIGHT;
+
+	if (tiledWidth == 0 || tiledHeight == 0)
+	{
+		return;
+	}
+
+	if (mMaskedSWOcclusionCulling != nullptr)
+	{
+		mMaskedSWOcclusionCulling->Resize(tiledWidth, tiledHeight);
+	}
+}

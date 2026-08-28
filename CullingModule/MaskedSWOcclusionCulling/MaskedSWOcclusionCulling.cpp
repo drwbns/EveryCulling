@@ -67,4 +67,7 @@ bool culling::MaskedSWOcclusionCulling::GetIsOccluderExist() const
 
 	
 
-
+void culling::MaskedSWOcclusionCulling::Resize(const std::uint32_t width, const std::uint32_t height)
+{
+	mDepthBuffer.Resize(width, height);
+}

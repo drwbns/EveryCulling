@@ -210,36 +210,36 @@ namespace culling
 
 	struct Resolution
 	{
-		const std::uint32_t mWidth;
-		const std::uint32_t mHeight;
-		const std::uint32_t mRowTileCount;
-		const std::uint32_t mColumnTileCount;
-		const std::uint32_t mRowSubTileCount;
-		const std::uint32_t mColumnSubTileCount;
+		std::uint32_t mWidth;
+		std::uint32_t mHeight;
+		std::uint32_t mRowTileCount;
+		std::uint32_t mColumnTileCount;
+		std::uint32_t mRowSubTileCount;
+		std::uint32_t mColumnSubTileCount;
 
 		/// <summary>
 		/// 0
 		/// </summary>
-		const std::uint32_t mLeftBottomTileOrginX;
+		std::uint32_t mLeftBottomTileOrginX;
 		
 		/// <summary>
 		/// 0
 		/// </summary>
-		const std::uint32_t mLeftBottomTileOrginY;
+		std::uint32_t mLeftBottomTileOrginY;
 		
 		/// <summary>
 		/// Left Bottom PointX of Right Top Tile
 		/// if Buffer Width is 37 -> 32
 		/// if Buffer Width is 64 -> 32
 		/// </summary>
-		const std::uint32_t mRightTopTileOrginX;
+		std::uint32_t mRightTopTileOrginX;
 		
 		/// <summary>
 		/// Left Bottom PointY of Right Top Tile
 		/// if Buffer Width is 37 -> 32
 		/// if Buffer Width is 64 -> 32
 		/// </summary>
-		const std::uint32_t mRightTopTileOrginY;
+		std::uint32_t mRightTopTileOrginY;
 
 #if EVERYCULLING_NDC_RANGE == EVERYCULLING_MINUS_ONE_TO_POSITIVE_ONE
 		culling::EVERYCULLING_M256F mReplicatedScreenHalfWidth;
@@ -303,7 +303,7 @@ namespace culling
 
 	public:
 
-		const Resolution mResolution;
+		Resolution mResolution;
 
 		/// <summary>
 		/// 
@@ -313,6 +313,13 @@ namespace culling
 		SWDepthBuffer(std::uint32_t width, std::uint32_t height);
 
 		~SWDepthBuffer();
+
+		/// <summary>
+		/// Reallocates the buffer for a new screen size, for when the window is
+		/// resized. Width must be a multiple of EVERYCULLING_TILE_WIDTH and height
+		/// of EVERYCULLING_TILE_HEIGHT, as at construction.
+		/// </summary>
+		void Resize(const std::uint32_t width, const std::uint32_t height);
 
 		EVERYCULLING_FORCE_INLINE size_t GetTileCount() const
 		{
