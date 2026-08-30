@@ -176,6 +176,12 @@ void culling::EveryCulling::PreCullJob()
 	ResetEntityBlocks();
 	ResetCullingModules();
 
+#ifdef EVERYCULLING_PROFILING_CULLING
+	// Cleared with everything else, so a module that is switched off this frame
+	// stops reporting the time it used to take.
+	mEveryCullingProfiler.ResetProfilingDatas();
+#endif
+
 	//release!
 	std::atomic_thread_fence(std::memory_order_seq_cst);
 }
@@ -221,6 +227,30 @@ void culling::EveryCulling::SetEnabledCullingModule(const CullingModuleType cull
 		break;
 		
 	}
+}
+
+bool culling::EveryCulling::GetIsCullingModuleEnabled(const CullingModuleType cullingModuleType) const
+{
+	switch (cullingModuleType)
+	{
+
+	case CullingModuleType::PreCulling:
+		return mPreCulling->IsEnabled;
+
+	case CullingModuleType::ViewFrustumCulling:
+		return mViewFrustumCulling->IsEnabled;
+
+	case CullingModuleType::MaskedSWOcclusionCulling:
+		// Reported from the stage that decides whether anything is culled, since
+		// SetEnabledCullingModule always writes the four together.
+		return mMaskedSWOcclusionCulling->mQueryOccludeeStage.IsEnabled;
+
+	case CullingModuleType::DistanceCulling:
+		return mDistanceCulling->IsEnabled;
+
+	}
+
+	return false;
 }
 
 std::uint32_t culling::EveryCulling::GetRunningThreadCount() const

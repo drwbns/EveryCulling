@@ -36,6 +36,14 @@ culling::EveryCullingProfiler::EveryCullingProfiler()
 
 }
 
+void culling::EveryCullingProfiler::ResetProfilingDatas()
+{
+	for (std::pair<const std::string_view, ProfilingData>& profilingData : mProfilingDatas)
+	{
+		profilingData.second.mElapsedTime = 0.0;
+	}
+}
+
 double culling::EveryCullingProfiler::GetElapsedTime(const char* const cullingModuleName)
 {
 	return mProfilingDatas[cullingModuleName].mElapsedTime;

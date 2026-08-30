@@ -37,6 +37,16 @@ namespace culling
 
 		EveryCullingProfiler();
 
+		/// <summary>
+		/// Zeroes every recorded time, so a module that does not run this frame
+		/// reads as zero rather than keeping whatever it last cost.
+		///
+		/// Without this a disabled module still shows its old number, which reads
+		/// as though it were still running and makes a comparison between two
+		/// culling modes wrong in the direction that is hardest to notice.
+		/// </summary>
+		void ResetProfilingDatas();
+
 		double GetElapsedTime(const char* const cullingModuleName);
 		const std::unordered_map<std::string_view, ProfilingData>& GetProfilingDatas() const;
 	};

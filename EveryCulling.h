@@ -237,6 +237,16 @@ namespace culling
 
 		const culling::CullingModule* GetLastEnabledCullingModule() const;
 		void SetEnabledCullingModule(const CullingModuleType cullingModuleType, const bool isEnabled);
+
+		/// <summary>
+		/// Whether a module is currently running.
+		///
+		/// Needed because the state could only be written, never read, so any
+		/// interface offering these as toggles had to keep its own copy and
+		/// hope it matched. It did not: the modules start from config.ini and
+		/// the demo component, so the copy was wrong from the first frame.
+		/// </summary>
+		bool GetIsCullingModuleEnabled(const CullingModuleType cullingModuleType) const;
 		std::uint32_t GetRunningThreadCount() const;
 
 	};
