@@ -499,8 +499,9 @@ void culling::EveryCulling::SetResolution(const std::uint32_t width, const std::
 {
 	// The software depth buffer is tiled, so it can only take whole tiles.
 	// Rounding down keeps it inside the window rather than sampling past it.
-	const std::uint32_t tiledWidth = (width / EVERYCULLING_TILE_WIDTH) * EVERYCULLING_TILE_WIDTH;
-	const std::uint32_t tiledHeight = (height / EVERYCULLING_TILE_HEIGHT) * EVERYCULLING_TILE_HEIGHT;
+	std::uint32_t tiledWidth = 0;
+	std::uint32_t tiledHeight = 0;
+	GetTiledResolution(width, height, tiledWidth, tiledHeight);
 
 	if (tiledWidth == 0 || tiledHeight == 0)
 	{

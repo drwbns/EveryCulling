@@ -31,6 +31,28 @@ namespace culling
 
 	void ExtractSIMDPlanesFromViewProjectionMatrix(const Mat4x4& viewProjectionMatrix, Vec4* eightPlanes, bool normalize) noexcept;
 
+	/// <summary>
+	/// The resolution the tiled software depth buffer can actually take: the
+	/// window size rounded down to whole tiles.
+	///
+	/// Separated from EveryCulling::SetResolution so the rounding -- which
+	/// once hid a whole class of off-by-a-tile bug -- is testable without
+	/// constructing a culling system. Rounding down keeps the buffer inside
+	/// the window rather than sampling past it, and a window smaller than one
+	/// tile rounds to zero, which the caller has to check for.
+	/// </summary>
+	EVERYCULLING_FORCE_INLINE void GetTiledResolution
+	(
+		const std::uint32_t width,
+		const std::uint32_t height,
+		std::uint32_t& outTiledWidth,
+		std::uint32_t& outTiledHeight
+	) noexcept
+	{
+		outTiledWidth = (width / EVERYCULLING_TILE_WIDTH) * EVERYCULLING_TILE_WIDTH;
+		outTiledHeight = (height / EVERYCULLING_TILE_HEIGHT) * EVERYCULLING_TILE_HEIGHT;
+	}
+
 	EVERYCULLING_FORCE_INLINE Vec4 operator*(const culling::Mat4x4& mat4, const culling::Vec3& vec3) noexcept
 	{
 		return Vec4
